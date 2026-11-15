@@ -192,6 +192,11 @@ def file_fingerprint(pdf_path: Union[str, Path]) -> str:
     return hashlib.sha256(Path(pdf_path).read_bytes()).hexdigest()[:16]
 
 
+def embedding_model_tag(model_identifier: str) -> str:
+    """Short Chroma-safe tag for an embedding model, used as a collection-name suffix."""
+    return re.sub(r"[^a-zA-Z0-9]+", "-", str(model_identifier)).strip("-")[:16]
+
+
 def safe_collection_name(
     pdf_path: Union[str, Path],
     chunk_size: int,
@@ -200,7 +205,7 @@ def safe_collection_name(
 ) -> str:
     """Generate a Chroma-compatible collection name (3-63 alphanumeric/dash chars)."""
     fp = file_fingerprint(pdf_path)
-    clean_model = re.sub(r"[^a-zA-Z0-9]+", "-", str(model_identifier)).strip("-")[:16]
+    clean_model = embedding_model_tag(model_identifier)
     name = f"paper-{fp}-{chunk_size}-{chunk_overlap}-{clean_model}".strip("-")
     if len(name) > 60:
         h = hashlib.md5(name.encode("utf-8")).hexdigest()[:8]
