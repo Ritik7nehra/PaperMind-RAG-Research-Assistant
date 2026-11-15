@@ -28,6 +28,8 @@ question + chat history → standalone question → retriever → relevant chunk
   - Rapid paper Q&A directly from PowerShell or bash.
   - Slash commands: `/sources`, `/stats`, `/clear`, `/help`.
   - Full argument support for `--mock`, `--openai`, `--model`, `-k`, and custom PDF paths.
+- **MCP Server (`mcp_server.py`)**:
+  - Index and search papers from any MCP client (Claude Desktop, Claude Code, Cursor, custom agents).
 - **Automated Test Suite (`test_rag.py`)**:
   - Full pipeline verification covering embeddings, document loading, text splitting, Chroma indexing, follow-up query rewriting, and factual Q&A accuracy.
 
@@ -232,9 +234,45 @@ Inside the CLI, you can use:
 - `/clear` — reset conversation history
 - `exit` or `quit` — exit the CLI
 
+### MCP Server (use PaperMind from Claude, Cursor, or your own agents)
+
+`mcp_server.py` exposes the RAG pipeline over the [Model Context Protocol](https://modelcontextprotocol.io), so any MCP client can index and search your papers.
+
+| Tool | What it does |
+|------|--------------|
+| `list_papers` | Lists the papers that are already indexed |
+| `index_paper(pdf_path, chunk_size, chunk_overlap)` | Indexes a PDF and returns its `paper_id` |
+| `search_paper(paper_id, query, k)` | Returns the `k` most relevant excerpts with page numbers |
+| `paper_stats(paper_id)` | File name, page count, chunk count, and embedding model |
+
+The server only retrieves: it returns excerpts and page numbers, and the client's own model writes the answer. It therefore needs no chat-model key. Embeddings follow the same mock / OpenAI switch as the rest of the project (`.env`).
+
+Run it directly (stdio transport):
+```powershell
+.\venv\Scripts\python mcp_server.py
+```
+
+Or register it with an MCP client. Example client configuration (use absolute paths):
+```json
+{
+  "mcpServers": {
+    "papermind": {
+      "command": "C:/path/to/project/venv/Scripts/python.exe",
+      "args": ["C:/path/to/project/mcp_server.py"],
+      "env": { "ENABLE_MOCK_MODE": "true" }
+    }
+  }
+}
+```
+
+Optional environment variables:
+- `PAPERMIND_PDF_DIRS` — extra folders `index_paper` may read PDFs from (separated by `;` on Windows, `:` elsewhere). By default only this project's `data/` folder is allowed.
+- `PAPERMIND_CHROMA_DIR` — where the vector store is kept (default `chroma_db/`).
+
 ### Running the Test Suite
 ```powershell
 .\venv\Scripts\python test_rag.py
+.\venv\Scripts\python test_mcp_server.py
 ```
 
 ---
@@ -246,7 +284,9 @@ Inside the CLI, you can use:
 | `rag.py` | Full RAG pipeline: PDF loader, text splitter, embeddings (`MockEmbeddings` + `OpenAIEmbeddings`), Chroma vector store, retriever, and `PaperChat` |
 | `app.py` | Streamlit web application with sidebar controls, streaming chat, sources explorer, and markdown export |
 | `cli.py` | Terminal-based interactive paper chat with argument parsing and slash commands |
+| `mcp_server.py` | MCP server exposing indexing and retrieval as tools for any MCP client |
 | `test_rag.py` | Comprehensive test suite testing embeddings, splitting, indexing, and Q&A accuracy |
+| `test_mcp_server.py` | MCP server tests, including an end-to-end run over stdio |
 | `data/paper.pdf` | Sample research paper (*A Short Note on Attention-Based Sequence Models*) |
 | `data/uploads/` | Persistent upload directory for user-uploaded research papers |
 | `chroma_db/` | Persistent local vector store directory |
